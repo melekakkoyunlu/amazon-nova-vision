@@ -1,0 +1,19 @@
+# Güvenlik: AWS anahtarlarını sakladığımız dosya
+.env
+
+# Python Gereksizleri
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+
+# Geçici Medya Dosyaları (İndirilen videolar S3'e gidiyor, PC'de kalmasın)
+*.mp4
+*.jpg
+*.png
+backend/gecici_video.mp4
+
+# IDE Ayarları
+.vscode/
