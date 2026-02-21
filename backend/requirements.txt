@@ -1,0 +1,10 @@
+# Gerekli Python kütüphaneleri listesi
+
+fastapi
+uvicorn
+boto3
+yt-dlp
+python-dotenv
+requests
+
+# konsola pip install -r backend/requirements.txt yazarak hepsini kurabilirsiniz
