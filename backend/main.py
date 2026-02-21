@@ -14,13 +14,17 @@ def read_root():
 
 @app.post("/analyze")
 async def analyze(request: AnalyzeRequest):
-    # 1. Önce videoyu indir ve S3'e at
+    # 1. Video İndir ve S3'e at
     s3_uri = indir_ve_s3_yukle(request.url)
     
     if not s3_uri:
-        return {"error": "Video işlenemedi"}
+        return {"status": "error", "message": "Video indirilemedi."}
 
-    # 2. Nova ile analiz et
-    analiz_sonucu = video_analiz_et(s3_uri)
+    # 2. Frame tabanlı Nova analizi
+    analiz_sonuclari = video_analiz_et(s3_uri)
     
-    return {"s3_uri": s3_uri, "analysis": analiz_sonucu}
+    return {
+        "status": "success",
+        "s3_uri": s3_uri,
+        "results": analiz_sonuclari
+    }
