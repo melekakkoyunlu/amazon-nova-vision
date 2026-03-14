@@ -144,17 +144,7 @@ function App() {
             color: "#5b3df5",
           }}
         >
-          <div
-            style={{
-              width: "38px",
-              height: "38px",
-              margin: "0 auto 12px",
-              border: "4px solid #d8d2ff",
-              borderTop: "4px solid #5b3df5",
-              borderRadius: "50%",
-              animation: "spin 0.8s linear infinite",
-            }}
-          ></div>
+          <div className="loading-spinner"></div>
           Analiz sürüyor... Lütfen bekleyin.
         </div>
       )}
@@ -219,7 +209,3 @@ function App() {
 }
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App />);
-
-const styleTag = document.createElement("style");
-styleTag.innerHTML = "@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }";
-document.head.appendChild(styleTag);
