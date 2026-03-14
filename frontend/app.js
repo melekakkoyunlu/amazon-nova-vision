@@ -25,32 +25,108 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [analysisData, setAnalysisData] = useState([]);
   const [errorMessage, setErrorMessage] = useState("");
+  const [progressLogs, setProgressLogs] = useState([]);
+
+  const appendProgress = (message) => {
+    setProgressLogs((prev) => [...prev, message]);
+  };
 
   const handleAnalyze = async () => {
     if (!videoUrl) return;
     setLoading(true);
     setAnalysisData([]);
     setErrorMessage("");
+    setProgressLogs(["⏳ İşlem başlatıldı..."]);
+
+    let hasResult = false;
+
+    const processEventChunk = (chunk) => {
+      const line = chunk
+        .split("\n")
+        .find((item) => item.startsWith("data: "));
+
+      if (!line) return { done: false };
+
+      const event = JSON.parse(line.replace("data: ", ""));
+
+      if (event.type === "progress") {
+        appendProgress(event.message);
+        return { done: false };
+      }
+
+      if (event.type === "result") {
+        const normalizedResults = normalizeResults(event);
+        if (normalizedResults.length === 0) {
+          throw new Error("Analiz tamamlandı ama gösterilecek sonuç bulunamadı.");
+        }
+
+        hasResult = true;
+        setAnalysisData(normalizedResults);
+        appendProgress("🎉 Analiz tamamlandı, sonuçlar listeleniyor.");
+        return { done: false };
+      }
+
+      if (event.type === "error") {
+        throw new Error(event.message || "Analiz sırasında bir hata oluştu.");
+      }
+
+      if (event.type === "done") {
+        return { done: true };
+      }
+
+      return { done: false };
+    };
 
     try {
-      const response = await fetch("http://localhost:8000/analyze", {
+      const response = await fetch("http://localhost:8000/analyze/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: videoUrl }),
       });
 
-      const result = await response.json();
-      const normalizedResults = normalizeResults(result);
-
-      if (!response.ok || result?.status === "error") {
-        throw new Error(result?.message || "Analiz sırasında bir hata oluştu.");
+      if (!response.ok || !response.body) {
+        throw new Error("Sunucu stream yanıtı veremedi.");
       }
 
-      if (normalizedResults.length === 0) {
-        throw new Error("Analiz tamamlandı ama gösterilecek sonuç bulunamadı.");
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder("utf-8");
+      let buffer = "";
+      let streamDone = false;
+
+      while (!streamDone) {
+        const { value, done } = await reader.read();
+
+        if (done) {
+          buffer += decoder.decode();
+          break;
+        }
+
+        buffer += decoder.decode(value, { stream: true });
+        const chunks = buffer.split("\n\n");
+        buffer = chunks.pop() || "";
+
+        for (const chunk of chunks) {
+          const state = processEventChunk(chunk);
+          if (state.done) {
+            streamDone = true;
+            break;
+          }
+        }
       }
 
-      setAnalysisData(normalizedResults);
+      const trailingChunks = buffer
+        .split("\n\n")
+        .map((item) => item.trim())
+        .filter(Boolean);
+
+      for (const chunk of trailingChunks) {
+        const state = processEventChunk(chunk);
+        if (state.done) break;
+      }
+
+      if (!hasResult) {
+        throw new Error("Analiz bitti ama sonuç event'i alınamadı. Lütfen tekrar deneyin.");
+      }
     } catch (error) {
       console.error("Analiz hatası:", error);
       setErrorMessage(error.message || "Beklenmeyen bir hata oluştu.");
@@ -100,6 +176,26 @@ function App() {
           {loading ? "Nova AI Analiz Ediyor..." : "Analizi Başlat"}
         </button>
       </div>
+
+      {loading && progressLogs.length > 0 && (
+        <div
+          style={{
+            marginBottom: "24px",
+            padding: "14px 18px",
+            borderRadius: "10px",
+            background: "#eff6ff",
+            color: "#1d4ed8",
+            border: "1px solid #bfdbfe",
+          }}
+        >
+          <strong style={{ display: "block", marginBottom: "8px" }}>Canlı işlem durumu</strong>
+          <div style={{ maxHeight: "160px", overflowY: "auto", fontSize: "14px", lineHeight: 1.5 }}>
+            {progressLogs.map((log, idx) => (
+              <div key={`${log}-${idx}`}>{log}</div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {errorMessage && (
         <div
