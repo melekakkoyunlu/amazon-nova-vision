@@ -11,7 +11,6 @@ from .ai_engine import video_analiz_et
 
 app = FastAPI()
 
-# GÜVENLİK DUVARINI YIKIYORUZ: Frontend'in veriye ulaşması için şart
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -27,29 +26,10 @@ class AnalyzeRequest(BaseModel):
 def read_root():
     return {"status": "Amazon Nova Vision API Online"}
 
-@app.post("/analyze")
-async def analyze(request: AnalyzeRequest):
-    try:
-        # 1. Video İndir ve S3'e yükle
-        s3_uri = indir_ve_s3_yukle(request.url)
-        if not s3_uri:
-            return {"status": "error", "message": "Video indirilemedi."}
-
-        # 2. Nova Analizi
-        analiz_sonuclari = video_analiz_et(s3_uri)
-
-        # 3. Sonucu Frontend'e Gönder (JSON Formatı)
-        return {
-            "status": "success",
-            "results": analiz_sonuclari if analiz_sonuclari else []
-        }
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
-
 @app.post("/analyze/stream")
 async def analyze_stream(request: AnalyzeRequest):
     def event_generator():
-        progress_queue: queue.Queue[dict] = queue.Queue()
+        progress_queue = queue.Queue()
 
         def emit_progress(message: str):
             progress_queue.put({"type": "progress", "message": message})
@@ -58,11 +38,11 @@ async def analyze_stream(request: AnalyzeRequest):
             try:
                 s3_uri = indir_ve_s3_yukle(request.url, progress_callback=emit_progress)
                 if not s3_uri:
-                    progress_queue.put({"type": "error", "message": "Video indirilemedi."})
+                    progress_queue.put({"type": "error", "message": "Video indirilemedi veya S3'e yüklenemedi."})
                     return
 
                 analiz_sonuclari = video_analiz_et(s3_uri, progress_callback=emit_progress)
-                progress_queue.put({"type": "result", "results": analiz_sonuclari if analiz_sonuclari else []})
+                progress_queue.put({"type": "result", "results": analiz_sonuclari})
             except Exception as e:
                 progress_queue.put({"type": "error", "message": str(e)})
             finally:
