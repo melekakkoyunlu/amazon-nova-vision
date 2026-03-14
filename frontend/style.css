@@ -1,0 +1,97 @@
+/* frontend/style.css */
+body {
+  margin: 0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #f4f7f6;
+  color: #333;
+}
+
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 0;
+  border-bottom: 2px solid #5b3df5;
+}
+
+.logo {
+  font-size: 24px;
+  font-weight: bold;
+  color: #5b3df5;
+}
+
+.hero {
+  text-align: center;
+  padding: 50px 0;
+}
+
+.upload-box {
+  background: white;
+  padding: 30px;
+  border-radius: 15px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+  margin-top: 20px;
+}
+
+.primary-btn {
+  background-color: #5b3df5;
+  color: white;
+  padding: 12px 25px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.secondary-btn {
+  border: 1px solid #ddd;
+  background: white;
+  padding: 10px;
+}
+
+.processing-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 30px;
+  margin-top: 40px;
+}
+
+.demo-video {
+  width: 100%;
+  border-radius: 12px;
+  background: #000;
+}
+
+.active-output-card {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  border-left: 5px solid #5b3df5;
+  margin-bottom: 20px;
+}
+
+.timeline-item {
+  display: flex;
+  gap: 15px;
+  padding: 10px;
+  border-bottom: 1px solid #eee;
+}
+
+.timeline-item.active {
+  background: #eef2ff;
+  font-weight: bold;
+}
+
+.mini-tag {
+  font-size: 12px;
+  background: #5b3df5;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
