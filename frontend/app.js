@@ -25,32 +25,120 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [analysisData, setAnalysisData] = useState([]);
   const [errorMessage, setErrorMessage] = useState("");
+  const [progressLogs, setProgressLogs] = useState([]);
+
+  const appendProgress = (message) => {
+    setProgressLogs((prev) => [...prev, message]);
+  };
 
   const handleAnalyze = async () => {
     if (!videoUrl) return;
+
     setLoading(true);
     setAnalysisData([]);
     setErrorMessage("");
+    setProgressLogs(["⏳ İşlem başlatıldı..."]);
+
+    let gotResult = false;
 
     try {
-      const response = await fetch("http://localhost:8000/analyze", {
+      const response = await fetch("http://localhost:8000/analyze/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: videoUrl }),
       });
 
-      const result = await response.json();
-      const normalizedResults = normalizeResults(result);
-
-      if (!response.ok || result?.status === "error") {
-        throw new Error(result?.message || "Analiz sırasında bir hata oluştu.");
+      if (!response.ok || !response.body) {
+        throw new Error("Sunucu stream yanıtı veremedi.");
       }
 
-      if (normalizedResults.length === 0) {
-        throw new Error("Analiz tamamlandı ama gösterilecek sonuç bulunamadı.");
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder("utf-8");
+      let buffer = "";
+      let streamDone = false;
+
+      const processChunk = (rawChunk) => {
+        const chunks = rawChunk.split("\n\n");
+        const remains = chunks.pop() || "";
+
+        for (const chunk of chunks) {
+          const line = chunk
+            .split("\n")
+            .find((item) => item.startsWith("data: "));
+
+          if (!line) continue;
+
+          const event = JSON.parse(line.replace("data: ", ""));
+
+          if (event.type === "progress") {
+            appendProgress(event.message);
+            continue;
+          }
+
+          if (event.type === "result") {
+            const normalizedResults = normalizeResults(event);
+            if (normalizedResults.length === 0) {
+              throw new Error("Analiz tamamlandı ama gösterilecek sonuç bulunamadı.");
+            }
+
+            gotResult = true;
+            setAnalysisData(normalizedResults);
+            appendProgress("🎉 Analiz tamamlandı, sonuçlar listeleniyor.");
+            continue;
+          }
+
+          if (event.type === "error") {
+            throw new Error(event.message || "Analiz sırasında bir hata oluştu.");
+          }
+
+          if (event.type === "done") {
+            streamDone = true;
+          }
+        }
+
+        return remains;
+      };
+
+      while (!streamDone) {
+        const { value, done } = await reader.read();
+
+        if (value) {
+          buffer += decoder.decode(value, { stream: !done });
+          buffer = processChunk(buffer);
+        }
+
+        if (done) {
+          buffer += decoder.decode();
+          if (buffer.trim()) {
+            buffer = processChunk(`${buffer}\n\n`);
+          }
+          break;
+        }
       }
 
-      setAnalysisData(normalizedResults);
+      if (!gotResult) {
+        appendProgress("ℹ️ Stream erken kapandı, sonuçlar standart endpoint'ten alınıyor...");
+
+        const fallbackResponse = await fetch("http://localhost:8000/analyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: videoUrl }),
+        });
+
+        const fallbackResult = await fallbackResponse.json();
+        const normalizedResults = normalizeResults(fallbackResult);
+
+        if (!fallbackResponse.ok || fallbackResult?.status === "error") {
+          throw new Error(fallbackResult?.message || "Analiz sırasında bir hata oluştu.");
+        }
+
+        if (normalizedResults.length === 0) {
+          throw new Error("Analiz tamamlandı ama gösterilecek sonuç bulunamadı.");
+        }
+
+        setAnalysisData(normalizedResults);
+        appendProgress("🎉 Sonuçlar fallback endpoint'ten başarıyla alındı.");
+      }
     } catch (error) {
       console.error("Analiz hatası:", error);
       setErrorMessage(error.message || "Beklenmeyen bir hata oluştu.");
@@ -100,6 +188,26 @@ function App() {
           {loading ? "Nova AI Analiz Ediyor..." : "Analizi Başlat"}
         </button>
       </div>
+
+      {loading && progressLogs.length > 0 && (
+        <div
+          style={{
+            marginBottom: "24px",
+            padding: "14px 18px",
+            borderRadius: "10px",
+            background: "#eff6ff",
+            color: "#1d4ed8",
+            border: "1px solid #bfdbfe",
+          }}
+        >
+          <strong style={{ display: "block", marginBottom: "8px" }}>Canlı işlem durumu</strong>
+          <div style={{ maxHeight: "160px", overflowY: "auto", fontSize: "14px", lineHeight: 1.5 }}>
+            {progressLogs.map((log, idx) => (
+              <div key={`${log}-${idx}`}>{log}</div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {errorMessage && (
         <div
