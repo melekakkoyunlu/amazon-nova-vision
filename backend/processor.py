@@ -1,6 +1,7 @@
 import yt_dlp
 import boto3
 import os
+from typing import Callable, Optional
 from dotenv import load_dotenv
 from pathlib import Path
 
@@ -26,7 +27,7 @@ s3_client = boto3.client(
     region_name=REGION
 )
 
-def indir_ve_s3_yukle(url: str):
+def indir_ve_s3_yukle(url: str, progress_callback: Optional[Callable[[str], None]] = None):
     """URL'den videoyu indirir ve S3'e yükler."""
     ydl_opts = {
         'format': 'best[ext=mp4]',
@@ -35,12 +36,19 @@ def indir_ve_s3_yukle(url: str):
     }
 
     try:
-        print(f"📥 Linkten video indiriliyor: {url}")
+        log_line = f"📥 Linkten video indiriliyor: {url}"
+        print(log_line)
+        if progress_callback:
+            progress_callback(log_line)
+
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
         
         s3_key = f"temp_videos/gecici_video.mp4"
-        print(f"☁️ S3'e yükleniyor: {BUCKET_NAME}/{s3_key}")
+        log_line = f"☁️ S3'e yükleniyor: {BUCKET_NAME}/{s3_key}"
+        print(log_line)
+        if progress_callback:
+            progress_callback(log_line)
         
         s3_client.upload_file(VIDEO_PATH, BUCKET_NAME, s3_key)
         
@@ -48,5 +56,8 @@ def indir_ve_s3_yukle(url: str):
         return f"s3://{BUCKET_NAME}/{s3_key}"
         
     except Exception as e:
-        print(f"❌ İndirme/Yükleme Hatası: {e}")
+        log_line = f"❌ İndirme/Yükleme Hatası: {e}"
+        print(log_line)
+        if progress_callback:
+            progress_callback(log_line)
         return None
