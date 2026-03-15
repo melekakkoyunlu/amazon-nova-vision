@@ -9,7 +9,7 @@ from pathlib import Path
 env_path = Path(__file__).parent / ".env"
 load_dotenv(dotenv_path=env_path)
 
-# Klasör yapısını garantiye al (Videonun ana dizine inmesi için)
+# Proje kök dizini ve video yolu tanımları
 BASE_DIR = Path(__file__).parent.parent
 VIDEO_PATH = str(BASE_DIR / "gecici_video.mp4")
 
@@ -29,10 +29,19 @@ s3_client = boto3.client(
 
 def indir_ve_s3_yukle(url: str, progress_callback: Optional[Callable[[str], None]] = None):
     """URL'den videoyu indirir ve S3'e yükler."""
+    # Eski dosya varsa temizle
+    if os.path.exists(VIDEO_PATH):
+        try:
+            os.remove(VIDEO_PATH)
+        except:
+            pass
+
     ydl_opts = {
         'format': 'best[ext=mp4]',
-        'outtmpl': VIDEO_PATH, # Tam yolu kullanıyoruz
+        'outtmpl': VIDEO_PATH,
         'noplaylist': True,
+        'quiet': True,
+        'no_warnings': True,
     }
 
     try:
@@ -44,19 +53,20 @@ def indir_ve_s3_yukle(url: str, progress_callback: Optional[Callable[[str], None
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
         
-        s3_key = f"temp_videos/gecici_video.mp4"
+        if not os.path.exists(VIDEO_PATH):
+            raise Exception("Video dosyası indirilemedi.")
+
+        s3_key = "temp_videos/gecici_video.mp4"
         log_line = f"☁️ S3'e yükleniyor: {BUCKET_NAME}/{s3_key}"
         print(log_line)
         if progress_callback:
             progress_callback(log_line)
         
         s3_client.upload_file(VIDEO_PATH, BUCKET_NAME, s3_key)
-        
-        # Analiz bitene kadar dosyayı SİLMİYORUZ.
         return f"s3://{BUCKET_NAME}/{s3_key}"
         
     except Exception as e:
-        log_line = f"❌ İndirme/Yükleme Hatası: {e}"
+        log_line = f"❌ İndirme/Yükleme Hatası: {str(e)}"
         print(log_line)
         if progress_callback:
             progress_callback(log_line)
